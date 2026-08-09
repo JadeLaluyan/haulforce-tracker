@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 18% 10%;
+    --foreground: 210 20% 96%;
+    --card: 220 16% 14%;
+    --card-foreground: 210 20% 96%;
+    --popover: 220 16% 12%;
+    --popover-foreground: 210 20% 96%;
+    --primary: 210 68% 39%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 20%;
+    --secondary-foreground: 210 20% 96%;
+    --muted: 220 14% 20%;
+    --muted-foreground: 215 12% 65%;
+    --accent: 220 14% 24%;
+    --accent-foreground: 210 20% 96%;
+    --destructive: 6 63% 46%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 12% 24%;
+    --input: 220 12% 26%;
+    --ring: 210 68% 45%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Print styles for invoices / reports */
+@media print {
+  body {
+    background: #fff !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-area {
+    box-shadow: none !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+}

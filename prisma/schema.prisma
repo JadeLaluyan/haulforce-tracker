@@ -1,0 +1,210 @@
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["driverAdapters", "queryCompiler"]
+  engineType      = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  MANAGER
+  STAFF
+}
+
+enum TripStatus {
+  PENDING
+  IN_TRANSIT
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  GCASH
+  CHECK
+}
+
+enum ExpenseCategory {
+  FUEL
+  MAINTENANCE
+  TOLL
+  SALARY
+  PERMITS_LICENSES
+  OFFICE
+  OTHER
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role     @default(MANAGER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt @default(now())
+}
+
+model Driver {
+  id        String   @id @default(cuid())
+  name      String
+  licenseNo String?
+  contact   String?
+  address   String?
+  active    Boolean  @default(true)
+  trips     Trip[]
+  expenses  Expense[]
+  payrolls  PayrollInvoice[]
+  advances  CashAdvance[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt @default(now())
+}
+
+model CashAdvance {
+  id        String    @id @default(cuid())
+  driverId  String
+  driver    Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  date      DateTime
+  amount    Decimal   @db.Decimal(12, 2)
+  reason    String?
+  settled   Boolean   @default(false)
+  settledAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt @default(now())
+
+  @@index([driverId])
+  @@index([date])
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  company   String?
+  address   String?
+  contact   String?
+  email     String?
+  tin       String?
+  terms     String   @default("COD")
+  trips     Trip[]
+  payments  Payment[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt @default(now())
+}
+
+model Trip {
+  id            String        @id @default(cuid())
+  tripCode      String        @unique
+  date          DateTime
+  driverId      String
+  driver        Driver        @relation(fields: [driverId], references: [id])
+  customerId    String
+  customer      Customer      @relation(fields: [customerId], references: [id])
+  origin        String
+  destination   String
+  cargoType     String
+  weightKg      Decimal       @default(0) @db.Decimal(12, 2)
+  tripRate      Decimal       @db.Decimal(12, 2)
+  fuelCost      Decimal       @default(0) @db.Decimal(12, 2)
+  tollFee       Decimal       @default(0) @db.Decimal(12, 2)
+  mealAllowance Decimal       @default(0) @db.Decimal(12, 2)
+  otherExpenses Decimal       @default(0) @db.Decimal(12, 2)
+  driverFee     Decimal       @default(0) @db.Decimal(12, 2)
+  notes         String?
+  status        TripStatus    @default(COMPLETED)
+  paymentStatus PaymentStatus @default(UNPAID)
+  invoice       Invoice?
+  payments      Payment[]
+  expenses      Expense[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt @default(now())
+
+  @@index([date])
+  @@index([driverId])
+  @@index([customerId])
+}
+
+model Invoice {
+  id           String   @id @default(cuid())
+  invoiceNo    String   @unique
+  tripId       String   @unique
+  trip         Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  invoiceDate  DateTime @default(now())
+  paymentTerms String   @default("COD")
+  vatRate      Decimal  @default(12) @db.Decimal(5, 2)
+  subtotal     Decimal  @db.Decimal(12, 2)
+  vatAmount    Decimal  @db.Decimal(12, 2)
+  total        Decimal  @db.Decimal(12, 2)
+  payments     Payment[]
+  createdAt    DateTime @default(now())
+}
+
+model Payment {
+  id         String        @id @default(cuid())
+  date       DateTime
+  customerId String
+  customer   Customer      @relation(fields: [customerId], references: [id])
+  tripId     String?
+  trip       Trip?         @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  invoiceId  String?
+  invoice    Invoice?      @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  amount     Decimal       @db.Decimal(12, 2)
+  method     PaymentMethod @default(CASH)
+  refNo      String?
+  notes      String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt @default(now())
+
+  @@index([date])
+  @@index([customerId])
+}
+
+model Expense {
+  id          String          @id @default(cuid())
+  date        DateTime
+  category    ExpenseCategory
+  description String
+  amount      Decimal         @db.Decimal(12, 2)
+  driverId    String?
+  driver      Driver?         @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  tripId      String?
+  trip        Trip?           @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  notes       String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt @default(now())
+
+  @@index([date])
+  @@index([category])
+}
+
+model PayrollInvoice {
+  id            String   @id @default(cuid())
+  payrollNo     String   @unique
+  driverId      String
+  driver        Driver   @relation(fields: [driverId], references: [id])
+  periodStart   DateTime
+  periodEnd     DateTime
+  totalTrips    Int
+  totalEarnings Decimal  @db.Decimal(12, 2)
+  createdAt     DateTime @default(now())
+}
+
+model SavedReport {
+  id         String   @id @default(cuid())
+  type       String
+  title      String
+  periodFrom DateTime
+  periodTo   DateTime
+  payload    Json
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+}

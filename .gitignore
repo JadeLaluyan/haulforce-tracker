@@ -1,0 +1,10 @@
+node_modules
+.next
+.env
+*.tsbuildinfo
+next-env.d.ts
+
+# Offline-installer build artifacts (regenerated per install; not needed for web deploy)
+vendor/
+pgdata/
+config.json
