@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -30,7 +31,7 @@ import { useTableState } from "@/hooks/use-table-state";
 import { api, type Paginated } from "@/lib/api";
 import { payrollGenerateSchema, type PayrollGenerateInput } from "@/lib/validation";
 import { peso, formatDate } from "@/lib/format";
-import type { DriverDTO, PayrollDTO } from "@/types";
+import type { DriverDTO, HelperDTO, PayrollDTO } from "@/types";
 
 const PAGE_SIZE = 10;
 
@@ -41,6 +42,9 @@ export function PayrollView() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [drivers, setDrivers] = useState<DriverDTO[]>([]);
+  const [helpers, setHelpers] = useState<HelperDTO[]>([]);
+  const [payeeType, setPayeeType] = useState<"driver" | "helper">("driver");
+  const [outstanding, setOutstanding] = useState(0);
   const [generating, setGenerating] = useState(false);
   const [deleting, setDeleting] = useState<PayrollDTO | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -50,22 +54,56 @@ export function PayrollView() {
     handleSubmit,
     setValue,
     watch,
+    reset,
     formState: { errors },
   } = useForm<PayrollGenerateInput>({
     resolver: zodResolver(payrollGenerateSchema),
-    defaultValues: { driverId: "", periodStart: "", periodEnd: "" },
+    defaultValues: { driverId: "", helperId: "", periodStart: "", periodEnd: "", deductAmount: 0 },
   });
+
+  const driverId = watch("driverId");
+  const helperId = watch("helperId");
+  const payeeId = payeeType === "driver" ? driverId : helperId;
 
   useEffect(() => {
     (async () => {
       try {
-        const d = await api<{ data: DriverDTO[] }>("/api/drivers?all=1");
+        const [d, h] = await Promise.all([
+          api<{ data: DriverDTO[] }>("/api/drivers?all=1"),
+          api<{ data: HelperDTO[] }>("/api/helpers?all=1"),
+        ]);
         setDrivers(d.data);
+        setHelpers(h.data);
       } catch {
-        toast.error("Failed to load drivers");
+        toast.error("Failed to load drivers/helpers");
       }
     })();
   }, []);
+
+  // Load outstanding cash advance balance for the selected payee so the
+  // deduction field can be capped and pre-filled sensibly.
+  useEffect(() => {
+    if (!payeeId) {
+      setOutstanding(0);
+      return;
+    }
+    (async () => {
+      try {
+        const param = payeeType === "driver" ? "driverId" : "helperId";
+        const res = await api<{ outstanding: number }>(`/api/cash-advances?${param}=${payeeId}`);
+        setOutstanding(res.outstanding);
+      } catch {
+        setOutstanding(0);
+      }
+    })();
+  }, [payeeId, payeeType]);
+
+  function onPayeeTypeChange(next: "driver" | "helper") {
+    setPayeeType(next);
+    setValue("driverId", "");
+    setValue("helperId", "");
+    setValue("deductAmount", 0);
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -96,6 +134,8 @@ export function PayrollView() {
         body: JSON.stringify(values),
       });
       toast.success(`Payroll invoice ${res.data.payrollNo} generated`);
+      reset({ driverId: "", helperId: "", periodStart: "", periodEnd: "", deductAmount: 0 });
+      setOutstanding(0);
       router.push(`/payroll/${res.data.id}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to generate payroll");
@@ -125,7 +165,16 @@ export function PayrollView() {
       header: "Invoice #",
       render: (p) => <span className="font-mono text-xs">{p.payrollNo}</span>,
     },
-    { key: "driver", header: "Driver", render: (p) => p.driver.name },
+    {
+      key: "payee",
+      header: "Paid To",
+      render: (p) => (
+        <span>
+          {p.driver?.name ?? p.helper?.name}{" "}
+          {p.helper && <Badge variant="secondary" className="ml-1">Helper</Badge>}
+        </span>
+      ),
+    },
     {
       key: "period",
       header: "Period",
@@ -133,12 +182,21 @@ export function PayrollView() {
     },
     { key: "totalTrips", header: "Trips", className: "text-right" },
     {
-      key: "totalEarnings",
-      header: "Total Earnings",
+      key: "advanceDeduction",
+      header: "Advance Deducted",
       className: "text-right",
-      render: (p) => (
-        <span className="font-semibold text-emerald-400">{peso(p.totalEarnings)}</span>
-      ),
+      render: (p) =>
+        Number(p.advanceDeduction) > 0 ? (
+          <span className="text-amber-400">-{peso(p.advanceDeduction)}</span>
+        ) : (
+          <span className="text-muted-foreground">{peso(0)}</span>
+        ),
+    },
+    {
+      key: "netPay",
+      header: "Net Pay",
+      className: "text-right",
+      render: (p) => <span className="font-semibold text-emerald-400">{peso(p.netPay)}</span>,
     },
     { key: "createdAt", header: "Generated", render: (p) => formatDate(p.createdAt) },
   ];
@@ -156,18 +214,34 @@ export function PayrollView() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-1.5">
-                <Label>Select Driver *</Label>
-                <Select
-                  value={watch("driverId")}
-                  onValueChange={(v) => setValue("driverId", v, { shouldValidate: true })}
-                >
+                <Label>Payee Type</Label>
+                <Select value={payeeType} onValueChange={(v) => onPayeeTypeChange(v as "driver" | "helper")}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select driver" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {drivers.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.name}
+                    <SelectItem value="driver">Driver</SelectItem>
+                    <SelectItem value="helper">Helper</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label>Select {payeeType === "driver" ? "Driver" : "Helper"} *</Label>
+                <Select
+                  value={payeeId}
+                  onValueChange={(v) =>
+                    setValue(payeeType === "driver" ? "driverId" : "helperId", v, {
+                      shouldValidate: true,
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={`Select ${payeeType}`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(payeeType === "driver" ? drivers : helpers).map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -188,6 +262,23 @@ export function PayrollView() {
                 <Input id="periodEnd" type="date" {...register("periodEnd")} />
                 {errors.periodEnd && (
                   <p className="text-xs text-red-400">{errors.periodEnd.message}</p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="deductAmount">Deduct Cash Advance (₱)</Label>
+                <Input
+                  id="deductAmount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max={outstanding}
+                  {...register("deductAmount")}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Outstanding balance: <span className="font-semibold text-amber-400">{peso(outstanding)}</span>
+                </p>
+                {errors.deductAmount && (
+                  <p className="text-xs text-red-400">{errors.deductAmount.message}</p>
                 )}
               </div>
             </div>

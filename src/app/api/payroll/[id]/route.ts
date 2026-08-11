@@ -9,12 +9,14 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const { id } = await params;
     const payroll = await prisma.payrollInvoice.findUnique({
       where: { id },
-      include: { driver: true },
+      include: { driver: true, helper: true },
     });
     if (!payroll) return Response.json({ error: "Payroll invoice not found" }, { status: 404 });
     const trips = await prisma.trip.findMany({
       where: {
-        driverId: payroll.driverId,
+        ...(payroll.helperId
+          ? { helperId: payroll.helperId }
+          : { driverId: payroll.driverId as string }),
         date: { gte: payroll.periodStart, lte: payroll.periodEnd },
         status: { not: "CANCELLED" },
       },

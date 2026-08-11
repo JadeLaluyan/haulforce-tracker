@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { HandCoins, Loader2, Pencil, PlusCircle, Save, Trash2, Users } from "lucide-react";
+import { HandCoins, HardHat, Loader2, Pencil, PlusCircle, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,21 +27,21 @@ import {
 import { DataTable, type ColumnDef } from "@/components/data-table";
 import { useTableState } from "@/hooks/use-table-state";
 import { api, type Paginated } from "@/lib/api";
-import { driverSchema, type DriverInput } from "@/lib/validation";
+import { helperSchema, type HelperInput } from "@/lib/validation";
 import { formatDate, peso } from "@/lib/format";
 import { CashAdvancesDialog, type CashAdvanceParty } from "@/features/shared/cash-advances-dialog";
-import type { DriverDTO } from "@/types";
+import type { HelperDTO } from "@/types";
 
 const PAGE_SIZE = 10;
 
-export function DriversView() {
+export function HelpersView() {
   const table = useTableState("name");
-  const [rows, setRows] = useState<DriverDTO[]>([]);
+  const [rows, setRows] = useState<HelperDTO[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<DriverDTO | null>(null);
-  const [deleting, setDeleting] = useState<DriverDTO | null>(null);
+  const [editing, setEditing] = useState<HelperDTO | null>(null);
+  const [deleting, setDeleting] = useState<HelperDTO | null>(null);
   const [advancesFor, setAdvancesFor] = useState<CashAdvanceParty | null>(null);
   const [saveLoading, setSaveLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -53,9 +53,9 @@ export function DriversView() {
     setValue,
     watch,
     formState: { errors },
-  } = useForm<DriverInput>({
-    resolver: zodResolver(driverSchema),
-    defaultValues: { name: "", licenseNo: "", contact: "", address: "", active: true },
+  } = useForm<HelperInput>({
+    resolver: zodResolver(helperSchema),
+    defaultValues: { name: "", contact: "", address: "", active: true },
   });
 
   const load = useCallback(async () => {
@@ -69,11 +69,11 @@ export function DriversView() {
         params.set("sortKey", table.sortKey);
         params.set("sortDir", table.sortDir);
       }
-      const res = await api<Paginated<DriverDTO>>(`/api/drivers?${params.toString()}`);
+      const res = await api<Paginated<HelperDTO>>(`/api/helpers?${params.toString()}`);
       setRows(res.data);
       setTotal(res.total);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to load drivers");
+      toast.error(e instanceof Error ? e.message : "Failed to load helpers");
     } finally {
       setLoading(false);
     }
@@ -85,39 +85,38 @@ export function DriversView() {
 
   function openCreate() {
     setEditing(null);
-    reset({ name: "", licenseNo: "", contact: "", address: "", active: true });
+    reset({ name: "", contact: "", address: "", active: true });
     setDialogOpen(true);
   }
 
-  function openEdit(d: DriverDTO) {
-    setEditing(d);
+  function openEdit(h: HelperDTO) {
+    setEditing(h);
     reset({
-      name: d.name,
-      licenseNo: d.licenseNo ?? "",
-      contact: d.contact ?? "",
-      address: d.address ?? "",
-      active: d.active,
+      name: h.name,
+      contact: h.contact ?? "",
+      address: h.address ?? "",
+      active: h.active,
     });
     setDialogOpen(true);
   }
 
-  async function onSubmit(values: DriverInput) {
+  async function onSubmit(values: HelperInput) {
     setSaveLoading(true);
     try {
       if (editing) {
-        await api(`/api/drivers/${editing.id}`, {
+        await api(`/api/helpers/${editing.id}`, {
           method: "PUT",
           body: JSON.stringify(values),
         });
-        toast.success("Driver updated");
+        toast.success("Helper updated");
       } else {
-        await api("/api/drivers", { method: "POST", body: JSON.stringify(values) });
-        toast.success("Driver added");
+        await api("/api/helpers", { method: "POST", body: JSON.stringify(values) });
+        toast.success("Helper added");
       }
       setDialogOpen(false);
       load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to save driver");
+      toast.error(e instanceof Error ? e.message : "Failed to save helper");
     } finally {
       setSaveLoading(false);
     }
@@ -127,40 +126,39 @@ export function DriversView() {
     if (!deleting) return;
     setDeleteLoading(true);
     try {
-      await api(`/api/drivers/${deleting.id}`, { method: "DELETE" });
-      toast.success("Driver deleted");
+      await api(`/api/helpers/${deleting.id}`, { method: "DELETE" });
+      toast.success("Helper deleted");
       setDeleting(null);
       load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to delete driver");
+      toast.error(e instanceof Error ? e.message : "Failed to delete helper");
     } finally {
       setDeleteLoading(false);
     }
   }
 
-  const columns: ColumnDef<DriverDTO>[] = [
+  const columns: ColumnDef<HelperDTO>[] = [
     {
       key: "name",
-      header: "Driver Name",
+      header: "Helper Name",
       sortable: true,
-      render: (d) => <span className="font-medium">{d.name}</span>,
+      render: (h) => <span className="font-medium">{h.name}</span>,
     },
-    { key: "licenseNo", header: "License No.", render: (d) => d.licenseNo ?? "-" },
-    { key: "contact", header: "Contact", render: (d) => d.contact ?? "-" },
-    { key: "address", header: "Address", render: (d) => d.address ?? "-" },
+    { key: "contact", header: "Contact", render: (h) => h.contact ?? "-" },
+    { key: "address", header: "Address", render: (h) => h.address ?? "-" },
     {
       key: "tripCount",
       header: "Trips",
       className: "text-right",
-      render: (d) => d.tripCount ?? 0,
+      render: (h) => h.tripCount ?? 0,
     },
     {
       key: "advanceOutstanding",
       header: "Cash Advance",
       className: "text-right",
-      render: (d) =>
-        (d.advanceOutstanding ?? 0) > 0 ? (
-          <span className="font-semibold text-amber-400">{peso(d.advanceOutstanding)}</span>
+      render: (h) =>
+        (h.advanceOutstanding ?? 0) > 0 ? (
+          <span className="font-semibold text-amber-400">{peso(h.advanceOutstanding)}</span>
         ) : (
           <span className="text-muted-foreground">{peso(0)}</span>
         ),
@@ -168,9 +166,9 @@ export function DriversView() {
     {
       key: "active",
       header: "Status",
-      render: (d) => (
-        <Badge variant={d.active ? "success" : "secondary"}>
-          {d.active ? "Active" : "Inactive"}
+      render: (h) => (
+        <Badge variant={h.active ? "success" : "secondary"}>
+          {h.active ? "Active" : "Inactive"}
         </Badge>
       ),
     },
@@ -178,7 +176,7 @@ export function DriversView() {
       key: "createdAt",
       header: "Added",
       sortable: true,
-      render: (d) => formatDate(d.createdAt),
+      render: (h) => formatDate(h.createdAt),
     },
   ];
 
@@ -186,10 +184,10 @@ export function DriversView() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-brand-red">
-          <Users className="h-4 w-4" /> Drivers
+          <HardHat className="h-4 w-4" /> Helpers
         </h2>
         <Button variant="destructive" size="sm" onClick={openCreate}>
-          <PlusCircle /> Add Driver
+          <PlusCircle /> Add Helper
         </Button>
       </div>
 
@@ -203,8 +201,8 @@ export function DriversView() {
         sortKey={table.sortKey}
         sortDir={table.sortDir}
         loading={loading}
-        emptyTitle="No drivers found"
-        emptyDescription="Add your first driver to start recording trips."
+        emptyTitle="No helpers found"
+        emptyDescription="Add your first helper to assign them to trips."
         onSearchChange={table.setSearch}
         onPageChange={table.setPage}
         onSortChange={table.onSortChange}
@@ -212,7 +210,7 @@ export function DriversView() {
           {
             label: "Cash Advances",
             icon: <HandCoins />,
-            onClick: (d) => setAdvancesFor({ id: d.id, name: d.name, kind: "driver" }),
+            onClick: (h) => setAdvancesFor({ id: h.id, name: h.name, kind: "helper" }),
           },
           { label: "Edit", icon: <Pencil />, onClick: openEdit },
           { label: "Delete", icon: <Trash2 />, destructive: true, onClick: setDeleting },
@@ -228,30 +226,24 @@ export function DriversView() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editing ? "Edit Driver" : "Add Driver"}</DialogTitle>
+            <DialogTitle>{editing ? "Edit Helper" : "Add Helper"}</DialogTitle>
             <DialogDescription>
-              {editing ? "Update driver details." : "Register a new driver."}
+              {editing ? "Update helper details." : "Register a new helper."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
             <div className="space-y-1.5">
-              <Label htmlFor="dname">Name *</Label>
-              <Input id="dname" {...register("name")} />
+              <Label htmlFor="hname">Name *</Label>
+              <Input id="hname" {...register("name")} />
               {errors.name && <p className="text-xs text-red-400">{errors.name.message}</p>}
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="dlicense">License No.</Label>
-                <Input id="dlicense" {...register("licenseNo")} />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="dcontact">Contact</Label>
-                <Input id="dcontact" {...register("contact")} />
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="hcontact">Contact</Label>
+              <Input id="hcontact" {...register("contact")} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="daddress">Address</Label>
-              <Input id="daddress" {...register("address")} />
+              <Label htmlFor="haddress">Address</Label>
+              <Input id="haddress" {...register("address")} />
             </div>
             <div className="space-y-1.5">
               <Label>Status</Label>
@@ -286,7 +278,7 @@ export function DriversView() {
           <DialogHeader>
             <DialogTitle>Delete {deleting?.name}?</DialogTitle>
             <DialogDescription>
-              Drivers with recorded trips cannot be deleted — mark them inactive instead.
+              Helpers with recorded trips cannot be deleted — mark them inactive instead.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

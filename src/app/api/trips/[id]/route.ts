@@ -13,6 +13,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       where: { id },
       include: {
         driver: true,
+        helper: true,
         customer: true,
         invoice: true,
         payments: { orderBy: { date: "desc" } },
@@ -46,6 +47,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
         data: {
           ...(input.date ? { date: new Date(input.date) } : {}),
           ...(input.driverId ? { driverId: input.driverId } : {}),
+          ...(input.helperId !== undefined ? { helperId: input.helperId || null } : {}),
           ...(input.customerId ? { customerId: input.customerId } : {}),
           ...(input.origin !== undefined ? { origin: input.origin } : {}),
           ...(input.destination !== undefined ? { destination: input.destination } : {}),
@@ -57,6 +59,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
           ...(input.mealAllowance !== undefined ? { mealAllowance: input.mealAllowance } : {}),
           ...(input.otherExpenses !== undefined ? { otherExpenses: input.otherExpenses } : {}),
           ...(input.driverFee !== undefined ? { driverFee: input.driverFee } : {}),
+          ...(input.helperFee !== undefined ? { helperFee: input.helperFee } : {}),
           ...(input.notes !== undefined ? { notes: input.notes || null } : {}),
           ...(input.status ? { status: input.status } : {}),
         },

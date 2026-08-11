@@ -3,6 +3,7 @@ import { z } from "zod";
 export const tripSchema = z.object({
   date: z.string().min(1, "Date is required"),
   driverId: z.string().min(1, "Driver is required"),
+  helperId: z.string().optional().or(z.literal("")),
   customerId: z.string().min(1, "Customer is required"),
   origin: z.string().min(1, "Origin is required"),
   destination: z.string().min(1, "Destination is required"),
@@ -14,6 +15,7 @@ export const tripSchema = z.object({
   mealAllowance: z.coerce.number().min(0, "Must be 0 or more"),
   otherExpenses: z.coerce.number().min(0, "Must be 0 or more"),
   driverFee: z.coerce.number().min(0, "Must be 0 or more"),
+  helperFee: z.coerce.number().min(0, "Must be 0 or more"),
   notes: z.string().optional(),
   status: z.enum(["PENDING", "IN_TRANSIT", "COMPLETED", "CANCELLED"]).default("COMPLETED"),
   paymentTerms: z.string().default("COD"),
@@ -22,6 +24,13 @@ export const tripSchema = z.object({
 export const driverSchema = z.object({
   name: z.string().min(1, "Name is required"),
   licenseNo: z.string().optional(),
+  contact: z.string().optional(),
+  address: z.string().optional(),
+  active: z.boolean().default(true),
+});
+
+export const helperSchema = z.object({
+  name: z.string().min(1, "Name is required"),
   contact: z.string().optional(),
   address: z.string().optional(),
   active: z.boolean().default(true),
@@ -64,21 +73,35 @@ export const expenseSchema = z.object({
   notes: z.string().optional(),
 });
 
-export const cashAdvanceSchema = z.object({
-  driverId: z.string().min(1, "Driver is required"),
-  date: z.string().min(1, "Date is required"),
-  amount: z.coerce.number().positive("Amount must be greater than 0"),
-  reason: z.string().optional(),
-});
+export const cashAdvanceSchema = z
+  .object({
+    driverId: z.string().optional().or(z.literal("")),
+    helperId: z.string().optional().or(z.literal("")),
+    date: z.string().min(1, "Date is required"),
+    amount: z.coerce.number().positive("Amount must be greater than 0"),
+    reason: z.string().optional(),
+  })
+  .refine((v) => !!v.driverId !== !!v.helperId, {
+    message: "Select either a driver or a helper",
+    path: ["driverId"],
+  });
 
-export const payrollGenerateSchema = z.object({
-  driverId: z.string().min(1, "Driver is required"),
-  periodStart: z.string().min(1, "Period start is required"),
-  periodEnd: z.string().min(1, "Period end is required"),
-});
+export const payrollGenerateSchema = z
+  .object({
+    driverId: z.string().optional().or(z.literal("")),
+    helperId: z.string().optional().or(z.literal("")),
+    periodStart: z.string().min(1, "Period start is required"),
+    periodEnd: z.string().min(1, "Period end is required"),
+    deductAmount: z.coerce.number().min(0, "Must be 0 or more").default(0),
+  })
+  .refine((v) => !!v.driverId !== !!v.helperId, {
+    message: "Select either a driver or a helper",
+    path: ["driverId"],
+  });
 
 export type TripInput = z.infer<typeof tripSchema>;
 export type DriverInput = z.infer<typeof driverSchema>;
+export type HelperInput = z.infer<typeof helperSchema>;
 export type CustomerInput = z.infer<typeof customerSchema>;
 export type PaymentInput = z.infer<typeof paymentSchema>;
 export type ExpenseInput = z.infer<typeof expenseSchema>;

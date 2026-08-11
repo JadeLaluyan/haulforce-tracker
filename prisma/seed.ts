@@ -172,6 +172,10 @@ async function main() {
   const payrollTrips = await prisma.trip.findMany({
     where: { driverId: rey.id, date: { gte: d(30) }, status: { not: "CANCELLED" } },
   });
+  const payrollEarnings = payrollTrips.reduce(
+    (s, t) => s + Number(t.driverFee) + Number(t.mealAllowance),
+    0
+  );
   await prisma.payrollInvoice.create({
     data: {
       payrollNo: `PAY-${new Date().getFullYear()}-0001`,
@@ -179,10 +183,9 @@ async function main() {
       periodStart: d(30),
       periodEnd: d(0),
       totalTrips: payrollTrips.length,
-      totalEarnings: payrollTrips.reduce(
-        (s, t) => s + Number(t.driverFee) + Number(t.mealAllowance),
-        0
-      ),
+      totalEarnings: payrollEarnings,
+      advanceDeduction: 0,
+      netPay: payrollEarnings,
     },
   });
 

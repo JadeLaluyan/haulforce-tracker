@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { api } from "@/lib/api";
 import { peso, formatDate, toDateInput } from "@/lib/format";
-import type { CashAdvanceDTO, DriverDTO } from "@/types";
+import type { CashAdvanceDTO } from "@/types";
 
 const formSchema = z.object({
   date: z.string().min(1, "Date is required"),
@@ -30,13 +30,19 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+export interface CashAdvanceParty {
+  id: string;
+  name: string;
+  kind: "driver" | "helper";
+}
+
 interface CashAdvancesDialogProps {
-  driver: DriverDTO | null;
+  party: CashAdvanceParty | null;
   onClose: () => void;
   onChanged: () => void;
 }
 
-export function CashAdvancesDialog({ driver, onClose, onChanged }: CashAdvancesDialogProps) {
+export function CashAdvancesDialog({ party, onClose, onChanged }: CashAdvancesDialogProps) {
   const [advances, setAdvances] = useState<CashAdvanceDTO[]>([]);
   const [outstanding, setOutstanding] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -53,11 +59,12 @@ export function CashAdvancesDialog({ driver, onClose, onChanged }: CashAdvancesD
   });
 
   const load = useCallback(async () => {
-    if (!driver) return;
+    if (!party) return;
     setLoading(true);
     try {
+      const param = party.kind === "driver" ? "driverId" : "helperId";
       const res = await api<{ data: CashAdvanceDTO[]; outstanding: number }>(
-        `/api/cash-advances?driverId=${driver.id}`
+        `/api/cash-advances?${param}=${party.id}`
       );
       setAdvances(res.data);
       setOutstanding(res.outstanding);
@@ -66,22 +73,26 @@ export function CashAdvancesDialog({ driver, onClose, onChanged }: CashAdvancesD
     } finally {
       setLoading(false);
     }
-  }, [driver]);
+  }, [party]);
 
   useEffect(() => {
-    if (driver) {
+    if (party) {
       reset({ date: toDateInput(new Date()), amount: 0, reason: "" });
       load();
     }
-  }, [driver, load, reset]);
+  }, [party, load, reset]);
 
   async function onSubmit(values: FormValues) {
-    if (!driver) return;
+    if (!party) return;
     setSaveLoading(true);
     try {
       await api("/api/cash-advances", {
         method: "POST",
-        body: JSON.stringify({ ...values, driverId: driver.id }),
+        body: JSON.stringify({
+          ...values,
+          driverId: party.kind === "driver" ? party.id : undefined,
+          helperId: party.kind === "helper" ? party.id : undefined,
+        }),
       });
       toast.success("Cash advance recorded");
       reset({ date: toDateInput(new Date()), amount: 0, reason: "" });
@@ -120,12 +131,12 @@ export function CashAdvancesDialog({ driver, onClose, onChanged }: CashAdvancesD
   }
 
   return (
-    <Dialog open={!!driver} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={!!party} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <HandCoins className="h-4 w-4 text-amber-400" />
-            Cash Advances — {driver?.name}
+            Cash Advances — {party?.name}
           </DialogTitle>
           <DialogDescription>
             Outstanding balance:{" "}
@@ -171,7 +182,7 @@ export function CashAdvancesDialog({ driver, onClose, onChanged }: CashAdvancesD
             </div>
           ) : advances.length === 0 ? (
             <div className="p-6 text-center text-sm text-muted-foreground">
-              No cash advances recorded for this driver.
+              No cash advances recorded for {party?.name ?? "this person"}.
             </div>
           ) : (
             <table className="w-full text-sm">

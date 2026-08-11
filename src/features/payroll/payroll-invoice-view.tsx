@@ -16,6 +16,7 @@ interface PayrollTrip {
   origin: string;
   destination: string;
   driverFee: string;
+  helperFee: string;
   mealAllowance: string;
 }
 
@@ -26,8 +27,11 @@ interface PayrollDetail {
   periodEnd: string;
   totalTrips: number;
   totalEarnings: string;
+  advanceDeduction: string;
+  netPay: string;
   createdAt: string;
-  driver: { id: string; name: string; contact: string | null };
+  driver: { id: string; name: string; contact: string | null } | null;
+  helper: { id: string; name: string; contact: string | null } | null;
   trips: PayrollTrip[];
 }
 
@@ -72,6 +76,9 @@ export function PayrollInvoiceView({ payrollId }: { payrollId: string }) {
     );
   }
 
+  const payee = payroll.driver ?? payroll.helper!;
+  const isHelper = !!payroll.helper;
+
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <div className="no-print flex flex-wrap items-center gap-2">
@@ -106,8 +113,8 @@ export function PayrollInvoiceView({ payrollId }: { payrollId: string }) {
             <dd className="font-semibold">{payroll.payrollNo}</dd>
           </div>
           <div className="flex gap-2">
-            <dt className="text-gray-500">Driver Name:</dt>
-            <dd className="font-semibold">{payroll.driver.name}</dd>
+            <dt className="text-gray-500">{isHelper ? "Helper Name:" : "Driver Name:"}</dt>
+            <dd className="font-semibold">{payee.name}</dd>
           </div>
           <div className="flex gap-2 sm:justify-end">
             <dt className="text-gray-500">Period:</dt>
@@ -122,21 +129,26 @@ export function PayrollInvoiceView({ payrollId }: { payrollId: string }) {
             <tr className="bg-blue-700 text-white">
               <th className="border border-blue-700 px-3 py-2 text-left">Date</th>
               <th className="border border-blue-700 px-3 py-2 text-left">Route</th>
-              <th className="border border-blue-700 px-3 py-2 text-right">Driver Fee</th>
-              <th className="border border-blue-700 px-3 py-2 text-right">Meal Allowance</th>
+              <th className="border border-blue-700 px-3 py-2 text-right">
+                {isHelper ? "Helper Fee" : "Driver Fee"}
+              </th>
+              {!isHelper && (
+                <th className="border border-blue-700 px-3 py-2 text-right">Meal Allowance</th>
+              )}
               <th className="border border-blue-700 px-3 py-2 text-right">Amount</th>
             </tr>
           </thead>
           <tbody>
             {payroll.trips.length === 0 ? (
               <tr>
-                <td colSpan={5} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
+                <td colSpan={isHelper ? 4 : 5} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
                   No trips recorded within this period.
                 </td>
               </tr>
             ) : (
               payroll.trips.map((t) => {
-                const amount = Number(t.driverFee) + Number(t.mealAllowance);
+                const fee = isHelper ? Number(t.helperFee) : Number(t.driverFee);
+                const amount = isHelper ? fee : fee + Number(t.mealAllowance);
                 return (
                   <tr key={t.id}>
                     <td className="border border-gray-300 px-3 py-2">
@@ -145,12 +157,12 @@ export function PayrollInvoiceView({ payrollId }: { payrollId: string }) {
                     <td className="border border-gray-300 px-3 py-2">
                       {t.origin} - {t.destination}
                     </td>
-                    <td className="border border-gray-300 px-3 py-2 text-right">
-                      {peso(t.driverFee)}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-right">
-                      {peso(t.mealAllowance)}
-                    </td>
+                    <td className="border border-gray-300 px-3 py-2 text-right">{peso(fee)}</td>
+                    {!isHelper && (
+                      <td className="border border-gray-300 px-3 py-2 text-right">
+                        {peso(t.mealAllowance)}
+                      </td>
+                    )}
                     <td className="border border-gray-300 px-3 py-2 text-right font-medium">
                       {peso(amount)}
                     </td>
@@ -161,11 +173,22 @@ export function PayrollInvoiceView({ payrollId }: { payrollId: string }) {
           </tbody>
         </table>
 
-        <div className="mt-6 text-right">
-          <p className="text-sm text-gray-600">Total Trips: {payroll.totalTrips}</p>
-          <p className="mt-1 text-xl font-extrabold">
-            Total Earnings: {peso(payroll.totalEarnings)}
-          </p>
+        <div className="mt-6 ml-auto w-full max-w-xs space-y-1 text-sm">
+          <p className="text-gray-600">Total Trips: {payroll.totalTrips}</p>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Gross Earnings</span>
+            <span className="font-medium">{peso(payroll.totalEarnings)}</span>
+          </div>
+          {Number(payroll.advanceDeduction) > 0 && (
+            <div className="flex justify-between text-red-600">
+              <span>Cash Advance Deduction</span>
+              <span className="font-medium">-{peso(payroll.advanceDeduction)}</span>
+            </div>
+          )}
+          <div className="flex justify-between border-t border-gray-300 pt-1 text-lg font-extrabold">
+            <span>Net Pay</span>
+            <span>{peso(payroll.netPay)}</span>
+          </div>
         </div>
 
         <div className="mt-10 grid grid-cols-2 gap-8 text-center text-sm">
@@ -174,7 +197,7 @@ export function PayrollInvoiceView({ payrollId }: { payrollId: string }) {
           </div>
           <div>
             <div className="mx-auto w-48 border-t border-gray-400 pt-1">
-              Received By: {payroll.driver.name}
+              Received By: {payee.name}
             </div>
           </div>
         </div>

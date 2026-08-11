@@ -8,11 +8,19 @@ export async function GET(req: NextRequest) {
   try {
     const sp = req.nextUrl.searchParams;
     const driverId = sp.get("driverId");
-    const where: Prisma.CashAdvanceWhereInput = driverId ? { driverId } : {};
+    const helperId = sp.get("helperId");
+    const where: Prisma.CashAdvanceWhereInput = driverId
+      ? { driverId }
+      : helperId
+        ? { helperId }
+        : {};
     const data = await prisma.cashAdvance.findMany({
       where,
       orderBy: { date: "desc" },
-      include: { driver: { select: { id: true, name: true } } },
+      include: {
+        driver: { select: { id: true, name: true } },
+        helper: { select: { id: true, name: true } },
+      },
     });
     const outstanding = data
       .filter((a) => !a.settled)
@@ -36,7 +44,8 @@ export async function POST(req: NextRequest) {
     const a = parsed.data;
     const advance = await prisma.cashAdvance.create({
       data: {
-        driverId: a.driverId,
+        driverId: a.driverId || null,
+        helperId: a.helperId || null,
         date: new Date(a.date),
         amount: a.amount,
         reason: a.reason || null,

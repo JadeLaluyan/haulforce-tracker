@@ -13,6 +13,7 @@ import type { TripDTO } from "@/types";
 
 interface FullTrip extends TripDTO {
   driver: { id: string; name: string; contact?: string | null };
+  helper: { id: string; name: string; contact?: string | null } | null;
   customer: {
     id: string;
     name: string;
@@ -238,10 +239,16 @@ export function InvoiceView({ tripId }: { tripId: string }) {
             <span className="text-gray-500">Notes: </span>
             <span className="font-medium">{trip.notes || "-"}</span>
           </p>
-          <p className="sm:col-span-2">
+          <p>
             <span className="text-gray-500">Driver: </span>
             <span className="font-medium">{trip.driver.name}</span>
           </p>
+          {trip.helper && (
+            <p>
+              <span className="text-gray-500">Helper: </span>
+              <span className="font-medium">{trip.helper.name}</span>
+            </p>
+          )}
         </div>
 
         <div className="mt-8 border-t border-gray-200 pt-4 text-center text-xs text-gray-500">

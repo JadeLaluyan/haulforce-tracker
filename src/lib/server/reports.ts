@@ -22,10 +22,10 @@ export interface ReportPayload {
 
 async function loadPeriodData(range: DateRange) {
   const dateFilter = { gte: range.from, lte: range.to };
-  const [trips, expenses, payments] = await Promise.all([
+  const [trips, expenses, payments, cashAdvances] = await Promise.all([
     prisma.trip.findMany({
       where: { date: dateFilter, status: { not: "CANCELLED" } },
-      include: { driver: true, customer: true, invoice: true, payments: true },
+      include: { driver: true, helper: true, customer: true, invoice: true, payments: true },
       orderBy: { date: "asc" },
     }),
     prisma.expense.findMany({
@@ -38,14 +38,19 @@ async function loadPeriodData(range: DateRange) {
       include: { customer: true },
       orderBy: { date: "asc" },
     }),
+    prisma.cashAdvance.findMany({
+      where: { date: dateFilter },
+      include: { driver: true, helper: true },
+      orderBy: { date: "asc" },
+    }),
   ]);
-  return { trips, expenses, payments };
+  return { trips, expenses, payments, cashAdvances };
 }
 
 const n = (v: unknown) => Number(v ?? 0);
 
 export async function buildReport(type: string, range: DateRange): Promise<ReportPayload> {
-  const { trips, expenses, payments } = await loadPeriodData(range);
+  const { trips, expenses, payments, cashAdvances } = await loadPeriodData(range);
   const period = { from: range.from.toISOString(), to: range.to.toISOString() };
 
   const freightRevenue = trips.reduce((s, t) => s + n(t.tripRate), 0);
@@ -54,14 +59,16 @@ export async function buildReport(type: string, range: DateRange): Promise<Repor
   const toll = trips.reduce((s, t) => s + n(t.tollFee), 0);
   const meals = trips.reduce((s, t) => s + n(t.mealAllowance), 0);
   const driverFees = trips.reduce((s, t) => s + n(t.driverFee), 0);
+  const helperFees = trips.reduce((s, t) => s + n(t.helperFee), 0);
   const otherTrip = trips.reduce((s, t) => s + n(t.otherExpenses), 0);
   const byCategory = new Map<string, number>();
   for (const e of expenses) {
     byCategory.set(e.category, (byCategory.get(e.category) ?? 0) + n(e.amount));
   }
   const generalTotal = expenses.reduce((s, e) => s + n(e.amount), 0);
-  const tripCostTotal = fuel + toll + meals + driverFees + otherTrip;
+  const tripCostTotal = fuel + toll + meals + driverFees + helperFees + otherTrip;
   const totalExpenses = tripCostTotal + generalTotal;
+  const cashAdvancesGiven = cashAdvances.reduce((s, a) => s + n(a.amount), 0);
 
   const catLabel = (c: string) =>
     c.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (m) => m.toUpperCase());
@@ -88,6 +95,7 @@ export async function buildReport(type: string, range: DateRange): Promise<Repor
               { label: "Toll Fees", value: toll, indent: true },
               { label: "Meal Allowances", value: meals, indent: true },
               { label: "Driver Fees", value: driverFees, indent: true },
+              { label: "Helper Fees", value: helperFees, indent: true },
               { label: "Other Trip Expenses", value: otherTrip, indent: true },
               { label: "Total Cost of Services", value: tripCostTotal, bold: true },
             ],
@@ -145,13 +153,15 @@ export async function buildReport(type: string, range: DateRange): Promise<Repor
         title: "TRIP SUMMARY REPORT",
         period,
         table: {
-          headers: ["Trip ID", "Date", "Driver", "Customer", "Route", "Cargo", "Rate", "Costs", "Profit"],
+          headers: ["Trip ID", "Date", "Driver", "Helper", "Customer", "Route", "Cargo", "Rate", "Costs", "Profit"],
           rows: trips.map((t) => {
-            const costs = n(t.fuelCost) + n(t.tollFee) + n(t.mealAllowance) + n(t.otherExpenses) + n(t.driverFee);
+            const costs =
+              n(t.fuelCost) + n(t.tollFee) + n(t.mealAllowance) + n(t.otherExpenses) + n(t.driverFee) + n(t.helperFee);
             return [
               t.tripCode,
               t.date.toISOString().slice(0, 10),
               t.driver.name,
+              t.helper?.name ?? "-",
               t.customer.company || t.customer.name,
               `${t.origin} - ${t.destination}`,
               t.cargoType,
@@ -241,6 +251,44 @@ export async function buildReport(type: string, range: DateRange): Promise<Repor
           { label: "Total Revenue", value: rows.reduce((s, r) => s + r.revenue, 0) },
           { label: "Total Driver Earnings", value: rows.reduce((s, r) => s + r.earnings, 0) },
         ],
+      };
+    }
+
+    case "cash-flow": {
+      const totalInflow = paymentsReceived;
+      const totalOutflow = fuel + toll + meals + driverFees + helperFees + otherTrip + generalTotal + cashAdvancesGiven;
+      return {
+        type,
+        title: "CASH FLOW STATEMENT",
+        period,
+        sections: [
+          {
+            title: "CASH INFLOW",
+            rows: [
+              { label: "Customer Payments Received", value: paymentsReceived, indent: true },
+              { label: "Total Cash Inflow", value: totalInflow, bold: true },
+            ],
+          },
+          {
+            title: "CASH OUTFLOW",
+            rows: [
+              { label: "Fuel", value: fuel, indent: true },
+              { label: "Toll Fees", value: toll, indent: true },
+              { label: "Meal Allowances", value: meals, indent: true },
+              { label: "Driver Fees", value: driverFees, indent: true },
+              { label: "Helper Fees", value: helperFees, indent: true },
+              { label: "Other Trip Expenses", value: otherTrip, indent: true },
+              ...Array.from(byCategory.entries()).map(([c, v]) => ({
+                label: catLabel(c),
+                value: v,
+                indent: true,
+              })),
+              { label: "Cash Advances Disbursed", value: cashAdvancesGiven, indent: true },
+              { label: "Total Cash Outflow", value: totalOutflow, bold: true },
+            ],
+          },
+        ],
+        totals: [{ label: "NET CASH FLOW", value: totalInflow - totalOutflow }],
       };
     }
 

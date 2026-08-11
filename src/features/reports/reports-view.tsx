@@ -1,14 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BookmarkPlus, Download, Eye, FileBarChart, FileSpreadsheet, Printer, RefreshCw, Trash2 } from "lucide-react";
+import { BookmarkPlus, CalendarRange, Download, Eye, FileBarChart, FileSpreadsheet, Printer, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePeriod } from "@/hooks/use-period";
 import { api } from "@/lib/api";
-import { peso, formatDateLong } from "@/lib/format";
+import { peso, formatDateLong, toDateInput } from "@/lib/format";
 import { COMPANY } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +31,7 @@ interface ReportPayload {
 const REPORT_TYPES = [
   { key: "income-statement", label: "Income Statement" },
   { key: "profit-loss", label: "P&L Statement" },
+  { key: "cash-flow", label: "Cash Flow" },
   { key: "trip-summary", label: "Trip Summary" },
   { key: "expense-report", label: "Expense Report" },
   { key: "customer-report", label: "Customer Report" },
@@ -57,7 +60,9 @@ const MONEY_HEADERS = new Set([
 ]);
 
 export function ReportsView() {
-  const { queryString } = usePeriod();
+  const { period, from, to, setPeriod, queryString } = usePeriod();
+  const [rangeFrom, setRangeFrom] = useState(from || toDateInput(new Date()));
+  const [rangeTo, setRangeTo] = useState(to || toDateInput(new Date()));
   const [type, setType] = useState<string>("income-statement");
   const [report, setReport] = useState<ReportPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -157,6 +162,47 @@ export function ReportsView() {
         <FileBarChart className="h-4 w-4" />
         Comprehensive Business Reports
       </h2>
+
+      {/* Report date range */}
+      <Card className="no-print">
+        <CardContent className="flex flex-wrap items-end gap-3 pt-4">
+          <div className="space-y-1">
+            <Label htmlFor="rfrom" className="flex items-center gap-1 text-xs">
+              <CalendarRange className="h-3.5 w-3.5" /> From
+            </Label>
+            <Input
+              id="rfrom"
+              type="date"
+              value={rangeFrom}
+              onChange={(e) => setRangeFrom(e.target.value)}
+              className="h-8 w-40"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="rto" className="text-xs">To</Label>
+            <Input
+              id="rto"
+              type="date"
+              value={rangeTo}
+              onChange={(e) => setRangeTo(e.target.value)}
+              className="h-8 w-40"
+            />
+          </div>
+          <Button
+            size="sm"
+            variant="destructive"
+            disabled={!rangeFrom || !rangeTo}
+            onClick={() => setPeriod("custom", rangeFrom, rangeTo)}
+          >
+            Apply Range
+          </Button>
+          {period === "custom" && (
+            <span className="text-xs text-muted-foreground">
+              Showing {formatDateLong(from)} – {formatDateLong(to)}
+            </span>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Report type selector */}
       <div className="no-print flex flex-wrap gap-2">

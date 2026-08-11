@@ -44,6 +44,7 @@ export async function GET(req: NextRequest) {
         take: pageSize,
         include: {
           driver: { select: { id: true, name: true } },
+          helper: { select: { id: true, name: true } },
           customer: { select: { id: true, name: true, company: true } },
           invoice: { select: { id: true, invoiceNo: true } },
         },
@@ -87,6 +88,7 @@ export async function POST(req: NextRequest) {
           tripCode,
           date: new Date(input.date),
           driverId: input.driverId,
+          helperId: input.helperId || null,
           customerId: input.customerId,
           origin: input.origin,
           destination: input.destination,
@@ -98,6 +100,7 @@ export async function POST(req: NextRequest) {
           mealAllowance: input.mealAllowance,
           otherExpenses: input.otherExpenses,
           driverFee: input.driverFee,
+          helperFee: input.helperFee,
           notes: input.notes || null,
           status: input.status,
           invoice: {

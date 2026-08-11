@@ -10,10 +10,23 @@ export interface DriverDTO {
   advanceOutstanding?: number;
 }
 
+export interface HelperDTO {
+  id: string;
+  name: string;
+  contact: string | null;
+  address: string | null;
+  active: boolean;
+  createdAt: string;
+  tripCount?: number;
+  advanceOutstanding?: number;
+}
+
 export interface CashAdvanceDTO {
   id: string;
-  driverId: string;
-  driver?: { id: string; name: string };
+  driverId: string | null;
+  driver?: { id: string; name: string } | null;
+  helperId: string | null;
+  helper?: { id: string; name: string } | null;
   date: string;
   amount: string;
   reason: string | null;
@@ -40,8 +53,10 @@ export interface TripDTO {
   tripCode: string;
   date: string;
   driverId: string;
+  helperId: string | null;
   customerId: string;
   driver: { id: string; name: string };
+  helper: { id: string; name: string } | null;
   customer: { id: string; name: string; company: string | null };
   origin: string;
   destination: string;
@@ -53,6 +68,7 @@ export interface TripDTO {
   mealAllowance: string;
   otherExpenses: string;
   driverFee: string;
+  helperFee: string;
   notes: string | null;
   status: "PENDING" | "IN_TRANSIT" | "COMPLETED" | "CANCELLED";
   paymentStatus: "UNPAID" | "PARTIAL" | "PAID";
@@ -106,12 +122,16 @@ export interface ExpenseDTO {
 export interface PayrollDTO {
   id: string;
   payrollNo: string;
-  driverId: string;
-  driver: { id: string; name: string };
+  driverId: string | null;
+  driver: { id: string; name: string } | null;
+  helperId: string | null;
+  helper: { id: string; name: string } | null;
   periodStart: string;
   periodEnd: string;
   totalTrips: number;
   totalEarnings: string;
+  advanceDeduction: string;
+  netPay: string;
   createdAt: string;
 }
 

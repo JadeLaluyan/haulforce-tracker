@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
           OR: [
             { payrollNo: { contains: search, mode: "insensitive" as const } },
             { driver: { name: { contains: search, mode: "insensitive" as const } } },
+            { helper: { name: { contains: search, mode: "insensitive" as const } } },
           ],
         }
       : {};
@@ -21,7 +22,10 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize,
-        include: { driver: { select: { id: true, name: true } } },
+        include: {
+          driver: { select: { id: true, name: true } },
+          helper: { select: { id: true, name: true } },
+        },
       }),
       prisma.payrollInvoice.count({ where }),
     ]);
@@ -41,21 +45,46 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    const { driverId, periodStart, periodEnd } = parsed.data;
+    const { driverId, helperId, periodStart, periodEnd, deductAmount } = parsed.data;
     const from = startOfDay(new Date(periodStart));
     const to = endOfDay(new Date(periodEnd));
     if (from > to) {
       return Response.json({ error: "Period start must be before period end" }, { status: 400 });
     }
 
+    const isHelper = !!helperId;
     const trips = await prisma.trip.findMany({
-      where: { driverId, date: { gte: from, lte: to }, status: { not: "CANCELLED" } },
+      where: {
+        ...(isHelper ? { helperId } : { driverId }),
+        date: { gte: from, lte: to },
+        status: { not: "CANCELLED" },
+      },
       orderBy: { date: "asc" },
     });
-    const totalEarnings = trips.reduce(
-      (s, t) => s + Number(t.driverFee) + Number(t.mealAllowance),
-      0
-    );
+    // Helpers are only paid their per-trip helper fee; meal allowance is
+    // attributed to the driver on the trip.
+    const totalEarnings = isHelper
+      ? trips.reduce((s, t) => s + Number(t.helperFee), 0)
+      : trips.reduce((s, t) => s + Number(t.driverFee) + Number(t.mealAllowance), 0);
+
+    const outstanding = await prisma.cashAdvance.aggregate({
+      where: { ...(isHelper ? { helperId } : { driverId }), settled: false },
+      _sum: { amount: true },
+    });
+    const outstandingAmount = Number(outstanding._sum.amount ?? 0);
+    if (deductAmount > outstandingAmount + 0.005) {
+      return Response.json(
+        { error: `Deduction cannot exceed the outstanding cash advance balance (${outstandingAmount.toFixed(2)})` },
+        { status: 400 }
+      );
+    }
+    if (deductAmount > totalEarnings + 0.005) {
+      return Response.json(
+        { error: "Deduction cannot exceed total earnings for this period" },
+        { status: 400 }
+      );
+    }
+    const netPay = totalEarnings - deductAmount;
 
     const payroll = await prisma.$transaction(async (tx) => {
       const count = await tx.payrollInvoice.count();
@@ -63,13 +92,16 @@ export async function POST(req: NextRequest) {
       return tx.payrollInvoice.create({
         data: {
           payrollNo,
-          driverId,
+          driverId: isHelper ? null : driverId,
+          helperId: isHelper ? helperId : null,
           periodStart: from,
           periodEnd: to,
           totalTrips: trips.length,
           totalEarnings,
+          advanceDeduction: deductAmount,
+          netPay,
         },
-        include: { driver: true },
+        include: { driver: true, helper: true },
       });
     });
 

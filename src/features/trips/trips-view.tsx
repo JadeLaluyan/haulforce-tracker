@@ -93,6 +93,7 @@ export function TripsView() {
     },
     { key: "date", header: "Date", sortable: true, render: (t) => formatDate(t.date) },
     { key: "driver", header: "Driver Name", render: (t) => t.driver.name },
+    { key: "helper", header: "Helper", render: (t) => t.helper?.name ?? "-" },
     {
       key: "customer",
       header: "Customer Name",

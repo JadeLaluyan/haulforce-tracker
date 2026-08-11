@@ -20,7 +20,7 @@ import {
 import { api } from "@/lib/api";
 import { tripSchema, type TripInput } from "@/lib/validation";
 import { toDateInput } from "@/lib/format";
-import type { DriverDTO, CustomerDTO, TripDTO } from "@/types";
+import type { DriverDTO, HelperDTO, CustomerDTO, TripDTO } from "@/types";
 
 interface TripFormProps {
   editing?: TripDTO | null;
@@ -41,6 +41,7 @@ const CARGO_TYPES = [
 
 export function TripForm({ editing, onSaved, onCancelEdit }: TripFormProps) {
   const [drivers, setDrivers] = useState<DriverDTO[]>([]);
+  const [helpers, setHelpers] = useState<HelperDTO[]>([]);
   const [customers, setCustomers] = useState<CustomerDTO[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -56,6 +57,7 @@ export function TripForm({ editing, onSaved, onCancelEdit }: TripFormProps) {
     defaultValues: {
       date: toDateInput(new Date()),
       driverId: "",
+      helperId: "",
       customerId: "",
       origin: "",
       destination: "",
@@ -67,6 +69,7 @@ export function TripForm({ editing, onSaved, onCancelEdit }: TripFormProps) {
       mealAllowance: 0,
       otherExpenses: 0,
       driverFee: 0,
+      helperFee: 0,
       notes: "",
       status: "COMPLETED",
       paymentTerms: "COD",
@@ -76,11 +79,13 @@ export function TripForm({ editing, onSaved, onCancelEdit }: TripFormProps) {
   useEffect(() => {
     (async () => {
       try {
-        const [d, c] = await Promise.all([
+        const [d, h, c] = await Promise.all([
           api<{ data: DriverDTO[] }>("/api/drivers?all=1"),
+          api<{ data: HelperDTO[] }>("/api/helpers?all=1"),
           api<{ data: CustomerDTO[] }>("/api/customers?all=1"),
         ]);
         setDrivers(d.data.filter((x) => x.active));
+        setHelpers(h.data.filter((x) => x.active));
         setCustomers(c.data);
       } catch {
         toast.error("Failed to load drivers/customers");
@@ -93,6 +98,7 @@ export function TripForm({ editing, onSaved, onCancelEdit }: TripFormProps) {
       reset({
         date: editing.date.slice(0, 10),
         driverId: editing.driverId,
+        helperId: editing.helperId ?? "",
         customerId: editing.customerId,
         origin: editing.origin,
         destination: editing.destination,
@@ -104,6 +110,7 @@ export function TripForm({ editing, onSaved, onCancelEdit }: TripFormProps) {
         mealAllowance: Number(editing.mealAllowance),
         otherExpenses: Number(editing.otherExpenses),
         driverFee: Number(editing.driverFee),
+        helperFee: Number(editing.helperFee),
         notes: editing.notes ?? "",
         status: editing.status,
         paymentTerms: "COD",
@@ -127,6 +134,7 @@ export function TripForm({ editing, onSaved, onCancelEdit }: TripFormProps) {
       reset({
         date: toDateInput(new Date()),
         driverId: "",
+        helperId: "",
         customerId: "",
         origin: "",
         destination: "",
@@ -138,6 +146,7 @@ export function TripForm({ editing, onSaved, onCancelEdit }: TripFormProps) {
         mealAllowance: 0,
         otherExpenses: 0,
         driverFee: 0,
+        helperFee: 0,
         notes: "",
         status: "COMPLETED",
         paymentTerms: "COD",
@@ -151,6 +160,7 @@ export function TripForm({ editing, onSaved, onCancelEdit }: TripFormProps) {
   }
 
   const driverId = watch("driverId");
+  const helperId = watch("helperId");
   const customerId = watch("customerId");
   const status = watch("status");
 
@@ -185,6 +195,25 @@ export function TripForm({ editing, onSaved, onCancelEdit }: TripFormProps) {
                 </SelectContent>
               </Select>
               {errors.driverId && <p className="text-xs text-red-400">{errors.driverId.message}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Helper (optional)</Label>
+              <Select
+                value={helperId || "none"}
+                onValueChange={(v) => setValue("helperId", v === "none" ? "" : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select helper" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— None —</SelectItem>
+                  {helpers.map((h) => (
+                    <SelectItem key={h.id} value={h.id}>
+                      {h.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Customer *</Label>
@@ -265,6 +294,11 @@ export function TripForm({ editing, onSaved, onCancelEdit }: TripFormProps) {
               <Label htmlFor="driverFee">Driver Fee (₱)</Label>
               <Input id="driverFee" type="number" step="0.01" min="0" {...register("driverFee")} />
               {errors.driverFee && <p className="text-xs text-red-400">{errors.driverFee.message}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="helperFee">Helper Fee (₱)</Label>
+              <Input id="helperFee" type="number" step="0.01" min="0" {...register("helperFee")} />
+              {errors.helperFee && <p className="text-xs text-red-400">{errors.helperFee.message}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="otherExpenses">Other Expenses (₱)</Label>
