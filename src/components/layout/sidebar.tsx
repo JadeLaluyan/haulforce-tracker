@@ -37,6 +37,7 @@ const NAV_SECTIONS = [
     items: [
       { href: "/drivers", label: "Drivers", icon: Users },
       { href: "/helpers", label: "Helpers", icon: HardHat },
+      { href: "/collectors", label: "Collectors", icon: Users },
       { href: "/customers", label: "Customers", icon: Building2 },
     ],
   },

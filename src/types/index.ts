@@ -21,6 +21,15 @@ export interface HelperDTO {
   advanceOutstanding?: number;
 }
 
+export interface CollectorDTO {
+  id: string;
+  name: string;
+  contact: string | null;
+  address: string | null;
+  active: boolean;
+  createdAt: string;
+}
+
 export interface CashAdvanceDTO {
   id: string;
   driverId: string | null;
@@ -54,12 +63,16 @@ export interface TripDTO {
   date: string;
   driverId: string;
   helperId: string | null;
+  helperIds?: string[];
+  collectorId: string | null;
   customerId: string;
   driver: { id: string; name: string };
   helper: { id: string; name: string } | null;
+  collector: { id: string; name: string } | null;
   customer: { id: string; name: string; company: string | null };
   origin: string;
   destination: string;
+  zone: string | null;
   cargoType: string;
   weightKg: string;
   tripRate: string;

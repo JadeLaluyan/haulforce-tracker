@@ -45,6 +45,7 @@ export async function GET(req: NextRequest) {
         include: {
           driver: { select: { id: true, name: true } },
           helper: { select: { id: true, name: true } },
+          collector: { select: { id: true, name: true } },
           customer: { select: { id: true, name: true, company: true } },
           invoice: { select: { id: true, invoiceNo: true } },
         },
@@ -69,6 +70,7 @@ export async function POST(req: NextRequest) {
       );
     }
     const input = parsed.data;
+    const helperIds = input.helperIds?.length ? input.helperIds : input.helperId ? [input.helperId] : [];
 
     const result = await prisma.$transaction(async (tx) => {
       const customer = await tx.customer.findUnique({ where: { id: input.customerId } });
@@ -88,10 +90,13 @@ export async function POST(req: NextRequest) {
           tripCode,
           date: new Date(input.date),
           driverId: input.driverId,
-          helperId: input.helperId || null,
+          helperId: helperIds[0] || null,
+          helperIds,
+          collectorId: input.collectorId || null,
           customerId: input.customerId,
           origin: input.origin,
           destination: input.destination,
+          zone: input.zone?.trim() || null,
           cargoType: input.cargoType,
           weightKg: input.weightKg,
           tripRate: input.tripRate,
@@ -107,7 +112,7 @@ export async function POST(req: NextRequest) {
             create: {
               invoiceNo,
               invoiceDate: new Date(input.date),
-              paymentTerms: customer.terms || input.paymentTerms,
+              paymentTerms: customer.terms || input.paymentTerms || "COD",
               vatRate: COMPANY.vatRate,
               subtotal,
               vatAmount,

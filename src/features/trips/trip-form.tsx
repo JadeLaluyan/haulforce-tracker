@@ -20,7 +20,7 @@ import {
 import { api } from "@/lib/api";
 import { tripSchema, type TripInput } from "@/lib/validation";
 import { toDateInput } from "@/lib/format";
-import type { DriverDTO, HelperDTO, CustomerDTO, TripDTO } from "@/types";
+import type { DriverDTO, HelperDTO, CollectorDTO, CustomerDTO, TripDTO } from "@/types";
 
 interface TripFormProps {
   editing?: TripDTO | null;
@@ -42,6 +42,7 @@ const CARGO_TYPES = [
 export function TripForm({ editing, onSaved, onCancelEdit }: TripFormProps) {
   const [drivers, setDrivers] = useState<DriverDTO[]>([]);
   const [helpers, setHelpers] = useState<HelperDTO[]>([]);
+  const [collectors, setCollectors] = useState<CollectorDTO[]>([]);
   const [customers, setCustomers] = useState<CustomerDTO[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -58,9 +59,12 @@ export function TripForm({ editing, onSaved, onCancelEdit }: TripFormProps) {
       date: toDateInput(new Date()),
       driverId: "",
       helperId: "",
+      helperIds: [],
+      collectorId: "",
       customerId: "",
       origin: "",
       destination: "",
+      zone: "",
       cargoType: "General Cargo",
       weightKg: 0,
       tripRate: 0,
@@ -72,36 +76,50 @@ export function TripForm({ editing, onSaved, onCancelEdit }: TripFormProps) {
       helperFee: 0,
       notes: "",
       status: "COMPLETED",
-      paymentTerms: "COD",
     },
   });
 
   useEffect(() => {
     (async () => {
       try {
-        const [d, h, c] = await Promise.all([
+        const [d, h, cl, c] = await Promise.all([
           api<{ data: DriverDTO[] }>("/api/drivers?all=1"),
           api<{ data: HelperDTO[] }>("/api/helpers?all=1"),
+          api<{ data: CollectorDTO[] }>("/api/collectors?all=1"),
           api<{ data: CustomerDTO[] }>("/api/customers?all=1"),
         ]);
         setDrivers(d.data.filter((x) => x.active));
         setHelpers(h.data.filter((x) => x.active));
+        setCollectors(cl.data.filter((x) => x.active));
         setCustomers(c.data);
       } catch {
-        toast.error("Failed to load drivers/customers");
+        toast.error("Failed to load drivers/helpers/collectors/customers");
       }
     })();
   }, []);
 
+  const selectedHelperIds = watch("helperIds") ?? [];
+  const helper1Id = selectedHelperIds[0] ?? "";
+  const helper2Id = selectedHelperIds[1] ?? "";
+
   useEffect(() => {
     if (editing) {
+      const helperIds = editing.helperIds?.length
+        ? editing.helperIds
+        : editing.helperId
+          ? [editing.helperId]
+          : [];
+
       reset({
         date: editing.date.slice(0, 10),
         driverId: editing.driverId,
-        helperId: editing.helperId ?? "",
+        helperId: helperIds[0] ?? "",
+        helperIds,
+        collectorId: editing.collectorId ?? "",
         customerId: editing.customerId,
         origin: editing.origin,
         destination: editing.destination,
+        zone: editing.zone ?? "",
         cargoType: editing.cargoType,
         weightKg: Number(editing.weightKg),
         tripRate: Number(editing.tripRate),
@@ -113,31 +131,54 @@ export function TripForm({ editing, onSaved, onCancelEdit }: TripFormProps) {
         helperFee: Number(editing.helperFee),
         notes: editing.notes ?? "",
         status: editing.status,
-        paymentTerms: "COD",
       });
     }
   }, [editing, reset]);
 
+  function applyHelperSelection(primaryId: string, secondaryId: string) {
+    const next = [primaryId, secondaryId].filter(Boolean);
+    const deduped = Array.from(new Set(next)).slice(0, 2);
+
+    if (next.length > deduped.length) {
+      toast.error("You can select up to 2 helpers per trip.");
+    }
+
+    setValue("helperIds", deduped, { shouldValidate: true });
+    setValue("helperId", deduped[0] ?? "", { shouldValidate: true });
+  }
+
   async function onSubmit(values: TripInput) {
     setLoading(true);
     try {
+      const helperIds = values.helperIds ?? [];
+      const payload = {
+        ...values,
+        helperIds,
+        helperId: helperIds[0] ?? "",
+        collectorId: values.collectorId || "",
+        zone: values.zone?.trim() || "",
+      };
+
       if (editing) {
         await api(`/api/trips/${editing.id}`, {
           method: "PUT",
-          body: JSON.stringify(values),
+          body: JSON.stringify(payload),
         });
         toast.success("Trip updated");
       } else {
-        await api("/api/trips", { method: "POST", body: JSON.stringify(values) });
+        await api("/api/trips", { method: "POST", body: JSON.stringify(payload) });
         toast.success("Trip saved with BIR invoice");
       }
       reset({
         date: toDateInput(new Date()),
         driverId: "",
         helperId: "",
+        helperIds: [],
+        collectorId: "",
         customerId: "",
         origin: "",
         destination: "",
+        zone: "",
         cargoType: "General Cargo",
         weightKg: 0,
         tripRate: 0,
@@ -149,7 +190,6 @@ export function TripForm({ editing, onSaved, onCancelEdit }: TripFormProps) {
         helperFee: 0,
         notes: "",
         status: "COMPLETED",
-        paymentTerms: "COD",
       });
       onSaved();
     } catch (e) {
@@ -160,7 +200,6 @@ export function TripForm({ editing, onSaved, onCancelEdit }: TripFormProps) {
   }
 
   const driverId = watch("driverId");
-  const helperId = watch("helperId");
   const customerId = watch("customerId");
   const status = watch("status");
 
@@ -197,23 +236,76 @@ export function TripForm({ editing, onSaved, onCancelEdit }: TripFormProps) {
               {errors.driverId && <p className="text-xs text-red-400">{errors.driverId.message}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label>Helper (optional)</Label>
+              <Label>Helpers (optional, max 2)</Label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Select
+                  value={helper1Id || "none"}
+                  onValueChange={(v) => {
+                    const nextPrimary = v === "none" ? "" : v;
+                    const nextSecondary = nextPrimary && nextPrimary === helper2Id ? "" : helper2Id;
+                    applyHelperSelection(nextPrimary, nextSecondary);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Helper 1" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— None —</SelectItem>
+                    {helpers.map((h) => (
+                      <SelectItem key={h.id} value={h.id}>
+                        {h.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={helper2Id || "none"}
+                  onValueChange={(v) => {
+                    const nextSecondary = v === "none" ? "" : v;
+                    applyHelperSelection(helper1Id, nextSecondary);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Helper 2" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— None —</SelectItem>
+                    {helpers
+                      .filter((h) => h.id !== helper1Id)
+                      .map((h) => (
+                        <SelectItem key={h.id} value={h.id}>
+                          {h.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {errors.helperIds && (
+                <p className="text-xs text-red-400">{errors.helperIds.message}</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Collector (optional)</Label>
               <Select
-                value={helperId || "none"}
-                onValueChange={(v) => setValue("helperId", v === "none" ? "" : v)}
+                value={watch("collectorId") || "none"}
+                onValueChange={(v) => setValue("collectorId", v === "none" ? "" : v, { shouldValidate: true })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select helper" />
+                  <SelectValue placeholder="Select collector" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">— None —</SelectItem>
-                  {helpers.map((h) => (
-                    <SelectItem key={h.id} value={h.id}>
-                      {h.name}
+                  {collectors.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {errors.collectorId && (
+                <p className="text-xs text-red-400">{errors.collectorId.message}</p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Customer *</Label>
@@ -245,6 +337,19 @@ export function TripForm({ editing, onSaved, onCancelEdit }: TripFormProps) {
                 <p className="text-xs text-red-400">{errors.destination.message}</p>
               )}
             </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="zone">Zone</Label>
+              <Textarea
+                id="zone"
+                placeholder="Optional destination description or identifier (max 200 chars)"
+                maxLength={200}
+                {...register("zone")}
+              />
+              <p className="text-[11px] text-slate-500">
+                {watch("zone")?.length ?? 0}/200 characters
+              </p>
+              {errors.zone && <p className="text-xs text-red-400">{errors.zone.message}</p>}
+            </div>
             <div className="space-y-1.5">
               <Label>Cargo Type *</Label>
               <Select
@@ -269,8 +374,15 @@ export function TripForm({ editing, onSaved, onCancelEdit }: TripFormProps) {
               {errors.weightKg && <p className="text-xs text-red-400">{errors.weightKg.message}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="tripRate">Trip Rate (₱) *</Label>
-              <Input id="tripRate" type="number" step="0.01" min="0" {...register("tripRate")} />
+              <Label htmlFor="tripRate">Trip Rate (₱)</Label>
+              <Input
+                id="tripRate"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Optional"
+                {...register("tripRate")}
+              />
               {errors.tripRate && <p className="text-xs text-red-400">{errors.tripRate.message}</p>}
             </div>
             <div className="space-y-1.5">

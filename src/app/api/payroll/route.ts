@@ -61,11 +61,10 @@ export async function POST(req: NextRequest) {
       },
       orderBy: { date: "asc" },
     });
-    // Helpers are only paid their per-trip helper fee; meal allowance is
-    // attributed to the driver on the trip.
+    // Payroll should not include meal allowance in any payout calculation.
     const totalEarnings = isHelper
       ? trips.reduce((s, t) => s + Number(t.helperFee), 0)
-      : trips.reduce((s, t) => s + Number(t.driverFee) + Number(t.mealAllowance), 0);
+      : trips.reduce((s, t) => s + Number(t.driverFee), 0);
 
     const outstanding = await prisma.cashAdvance.aggregate({
       where: { ...(isHelper ? { helperId } : { driverId }), settled: false },

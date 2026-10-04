@@ -4,12 +4,21 @@ export const tripSchema = z.object({
   date: z.string().min(1, "Date is required"),
   driverId: z.string().min(1, "Driver is required"),
   helperId: z.string().optional().or(z.literal("")),
+  helperIds: z
+    .array(z.string())
+    .max(2, "You can select up to 2 helpers per trip")
+    .refine((ids) => new Set(ids).size === ids.length, {
+      message: "Choose each helper only once",
+    })
+    .default([]),
+  collectorId: z.string().optional().or(z.literal("")),
   customerId: z.string().min(1, "Customer is required"),
   origin: z.string().min(1, "Origin is required"),
   destination: z.string().min(1, "Destination is required"),
+  zone: z.string().max(200, "Zone must be 200 characters or less").optional().or(z.literal("")),
   cargoType: z.string().min(1, "Cargo type is required"),
   weightKg: z.coerce.number().min(0, "Must be 0 or more"),
-  tripRate: z.coerce.number().positive("Trip rate must be greater than 0"),
+  tripRate: z.coerce.number().min(0, "Trip rate must be 0 or more").default(0),
   fuelCost: z.coerce.number().min(0, "Must be 0 or more"),
   tollFee: z.coerce.number().min(0, "Must be 0 or more"),
   mealAllowance: z.coerce.number().min(0, "Must be 0 or more"),
@@ -18,7 +27,7 @@ export const tripSchema = z.object({
   helperFee: z.coerce.number().min(0, "Must be 0 or more"),
   notes: z.string().optional(),
   status: z.enum(["PENDING", "IN_TRANSIT", "COMPLETED", "CANCELLED"]).default("COMPLETED"),
-  paymentTerms: z.string().default("COD"),
+  paymentTerms: z.string().optional().default("COD"),
 });
 
 export const driverSchema = z.object({
@@ -30,6 +39,13 @@ export const driverSchema = z.object({
 });
 
 export const helperSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  contact: z.string().optional(),
+  address: z.string().optional(),
+  active: z.boolean().default(true),
+});
+
+export const collectorSchema = z.object({
   name: z.string().min(1, "Name is required"),
   contact: z.string().optional(),
   address: z.string().optional(),
@@ -102,6 +118,7 @@ export const payrollGenerateSchema = z
 export type TripInput = z.infer<typeof tripSchema>;
 export type DriverInput = z.infer<typeof driverSchema>;
 export type HelperInput = z.infer<typeof helperSchema>;
+export type CollectorInput = z.infer<typeof collectorSchema>;
 export type CustomerInput = z.infer<typeof customerSchema>;
 export type PaymentInput = z.infer<typeof paymentSchema>;
 export type ExpenseInput = z.infer<typeof expenseSchema>;

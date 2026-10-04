@@ -7,11 +7,37 @@ import { join } from "node:path";
 import EmbeddedPostgres from "embedded-postgres";
 import { APP_DIR, DATA_DIR, loadConfig, dbUrl, startPg } from "./common.mjs";
 
+function execAsync(command) {
+  return new Promise((resolve, reject) => {
+    exec(command, (err, stdout, stderr) => {
+      if (err) reject(err);
+      else resolve({ stdout, stderr });
+    });
+  });
+}
+
+async function cleanupStaleApp(port) {
+  try {
+    const { stdout } = await execAsync(`netstat -ano -p tcp | findstr :${port}`);
+    const match = stdout.match(/LISTENING\s+(\d+)/i) || stdout.match(/\s(\d+)\s*$/m);
+    if (!match) return;
+    const pid = Number(match[1]);
+    if (!pid || pid === process.pid) return;
+
+    await execAsync(`taskkill /PID ${pid} /F`);
+    console.log(`Cleared stale process on port ${port} (PID ${pid}).`);
+  } catch {
+    /* ignore port cleanup failures */
+  }
+}
+
 const cfg = loadConfig();
 if (!cfg) {
   console.error("Not installed yet. Run install.bat first.");
   process.exit(1);
 }
+
+await cleanupStaleApp(cfg.appPort);
 
 const pg = new EmbeddedPostgres({
   databaseDir: DATA_DIR,

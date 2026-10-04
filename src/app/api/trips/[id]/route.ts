@@ -14,6 +14,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       include: {
         driver: true,
         helper: true,
+        collector: true,
         customer: true,
         invoice: true,
         payments: { orderBy: { date: "desc" } },
@@ -41,16 +42,24 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const existing = await prisma.trip.findUnique({ where: { id }, include: { invoice: true } });
     if (!existing) return Response.json({ error: "Trip not found" }, { status: 404 });
 
+    const helperIds = input.helperIds !== undefined
+      ? input.helperIds
+      : input.helperId !== undefined
+        ? (input.helperId ? [input.helperId] : [])
+        : undefined;
+
     const trip = await prisma.$transaction(async (tx) => {
       const updated = await tx.trip.update({
         where: { id },
         data: {
           ...(input.date ? { date: new Date(input.date) } : {}),
           ...(input.driverId ? { driverId: input.driverId } : {}),
-          ...(input.helperId !== undefined ? { helperId: input.helperId || null } : {}),
+          ...(helperIds !== undefined ? { helperId: helperIds[0] || null, helperIds } : {}),
+          ...(input.collectorId !== undefined ? { collectorId: input.collectorId || null } : {}),
           ...(input.customerId ? { customerId: input.customerId } : {}),
           ...(input.origin !== undefined ? { origin: input.origin } : {}),
           ...(input.destination !== undefined ? { destination: input.destination } : {}),
+          ...(input.zone !== undefined ? { zone: input.zone?.trim() || null } : {}),
           ...(input.cargoType !== undefined ? { cargoType: input.cargoType } : {}),
           ...(input.weightKg !== undefined ? { weightKg: input.weightKg } : {}),
           ...(input.tripRate !== undefined ? { tripRate: input.tripRate } : {}),

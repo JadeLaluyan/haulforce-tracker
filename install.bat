@@ -27,12 +27,15 @@ for /f "tokens=1 delims=." %%v in ('node -e "console.log(process.versions.node)"
 if %NODEMAJOR% LSS 20 ( echo [X] Node.js 20 or newer is required. & pause & exit /b 1 )
 
 echo [1/4] Installing application files (a few minutes on first run)...
-call npm install --omit=dev --no-audit --no-fund --loglevel=error
+call npm install --no-audit --no-fund --loglevel=error
 if errorlevel 1 ( echo Install failed. Check your internet connection. & pause & exit /b 1 )
 
-echo [2/4] Installing the database client...
-xcopy /e /i /y /q vendor\.prisma node_modules\.prisma >nul
-if errorlevel 1 ( echo Failed to install database client. & pause & exit /b 1 )
+echo [2/4] Generating the Prisma client...
+if exist "vendor\.prisma" (
+  xcopy /e /i /y /q "vendor\.prisma" "node_modules\.prisma" >nul
+)
+call npx prisma generate
+if errorlevel 1 ( echo Failed to generate database client. & pause & exit /b 1 )
 
 echo [3/4] Installing the private database for this PC...
 pushd desktop

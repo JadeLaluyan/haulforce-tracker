@@ -25,32 +25,58 @@ Custom Range) applies across Dashboard, Trips, Payments, Expenses, and Reports.
 
 ## Setup
 
-1. Requirements: Node 20+, PostgreSQL 14+.
+### Windows desktop app flow (recommended)
 
-2. Install dependencies:
+This project includes an offline desktop installer that starts its own embedded PostgreSQL database and launches the app in production mode.
 
-       npm install
+1. Open PowerShell in the project folder.
+2. Run the installer:
 
-3. Configure environment — copy `.env.example` to `.env` and set:
+   .\install.bat
 
-       DATABASE_URL="postgresql://user:pass@localhost:5432/haulforce?schema=public"
-       AUTH_SECRET="a-long-random-string"
+3. After setup completes, start the app:
 
-4. Create the database schema (either works):
+   & ".\Start Haulforce.bat"
 
-       npx prisma migrate deploy        # applies prisma/migrations
-       # or: npx prisma db push
-
-5. Generate the client and seed sample data:
-
-       npx prisma generate
-       npm run db:seed
-
-6. Run:
-
-       npm run dev
+4. The app will create its embedded database, apply migrations, and create the default admin account automatically.
 
    Login with the demo account: **admin@haulforce.ph / admin123**
+
+### Manual development flow
+
+Use this only if you want to run the app directly from the codebase with a PostgreSQL server already available.
+
+1.  Requirements: Node 20+, PostgreSQL 14+.
+
+2.  Install dependencies:
+
+    npm install
+
+3.  Configure environment — copy `.env.example` to `.env` and set:
+
+    DATABASE_URL="postgresql://user:pass@localhost:5432/haulforce?schema=public"
+    AUTH_SECRET="a-long-random-string"
+
+4.  Create the database schema (either works):
+
+    npx prisma migrate deploy # applies prisma/migrations
+
+    # or: npx prisma db push
+
+5.  Generate the client and seed sample data:
+
+    npx prisma generate
+    npm run db:seed
+
+6.  Run:
+
+        npm run dev
+
+    Login with the demo account: **admin@haulforce.ph / admin123**
+
+### Important note
+
+If you run the project without the embedded installer, the app will fail with a Prisma database error until a valid `DATABASE_URL` points to a real PostgreSQL database and that database has already been created.
 
 ## Notes
 

@@ -17,7 +17,6 @@ interface PayrollTrip {
   destination: string;
   driverFee: string;
   helperFee: string;
-  mealAllowance: string;
 }
 
 interface PayrollDetail {
@@ -132,23 +131,20 @@ export function PayrollInvoiceView({ payrollId }: { payrollId: string }) {
               <th className="border border-blue-700 px-3 py-2 text-right">
                 {isHelper ? "Helper Fee" : "Driver Fee"}
               </th>
-              {!isHelper && (
-                <th className="border border-blue-700 px-3 py-2 text-right">Meal Allowance</th>
-              )}
               <th className="border border-blue-700 px-3 py-2 text-right">Amount</th>
             </tr>
           </thead>
           <tbody>
             {payroll.trips.length === 0 ? (
               <tr>
-                <td colSpan={isHelper ? 4 : 5} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
+                <td colSpan={4} className="border border-gray-300 px-3 py-6 text-center text-gray-500">
                   No trips recorded within this period.
                 </td>
               </tr>
             ) : (
               payroll.trips.map((t) => {
                 const fee = isHelper ? Number(t.helperFee) : Number(t.driverFee);
-                const amount = isHelper ? fee : fee + Number(t.mealAllowance);
+                const amount = fee;
                 return (
                   <tr key={t.id}>
                     <td className="border border-gray-300 px-3 py-2">
@@ -158,11 +154,6 @@ export function PayrollInvoiceView({ payrollId }: { payrollId: string }) {
                       {t.origin} - {t.destination}
                     </td>
                     <td className="border border-gray-300 px-3 py-2 text-right">{peso(fee)}</td>
-                    {!isHelper && (
-                      <td className="border border-gray-300 px-3 py-2 text-right">
-                        {peso(t.mealAllowance)}
-                      </td>
-                    )}
                     <td className="border border-gray-300 px-3 py-2 text-right font-medium">
                       {peso(amount)}
                     </td>

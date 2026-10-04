@@ -82,6 +82,17 @@ model Helper {
   updatedAt DateTime @updatedAt @default(now())
 }
 
+model Collector {
+  id        String   @id @default(cuid())
+  name      String
+  contact   String?
+  address   String?
+  active    Boolean  @default(true)
+  trips     Trip[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt @default(now())
+}
+
 // Belongs to exactly one of driver / helper (enforced in the API layer —
 // Prisma has no portable CHECK-constraint syntax for "exactly one of").
 model CashAdvance {
@@ -125,11 +136,15 @@ model Trip {
   driverId      String
   driver        Driver        @relation(fields: [driverId], references: [id])
   helperId      String?
+  helperIds     String[]      @default([])
   helper        Helper?       @relation(fields: [helperId], references: [id])
+  collectorId   String?
+  collector     Collector?    @relation(fields: [collectorId], references: [id])
   customerId    String
   customer      Customer      @relation(fields: [customerId], references: [id])
   origin        String
   destination   String
+  zone          String?       @db.VarChar(200)
   cargoType     String
   weightKg      Decimal       @default(0) @db.Decimal(12, 2)
   tripRate      Decimal       @db.Decimal(12, 2)

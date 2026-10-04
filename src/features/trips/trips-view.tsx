@@ -94,6 +94,7 @@ export function TripsView() {
     { key: "date", header: "Date", sortable: true, render: (t) => formatDate(t.date) },
     { key: "driver", header: "Driver Name", render: (t) => t.driver.name },
     { key: "helper", header: "Helper", render: (t) => t.helper?.name ?? "-" },
+    { key: "collector", header: "Collector", render: (t) => t.collector?.name ?? "-" },
     {
       key: "customer",
       header: "Customer Name",
@@ -101,6 +102,16 @@ export function TripsView() {
     },
     { key: "origin", header: "Origin", sortable: true },
     { key: "destination", header: "Destination", sortable: true },
+    {
+      key: "zone",
+      header: "Zone",
+      className: "w-[120px] max-w-[120px]",
+      render: (t) => (
+        <span className="block max-w-[110px] truncate text-xs" title={t.zone || "-"}>
+          {t.zone || "-"}
+        </span>
+      ),
+    },
     {
       key: "tripRate",
       header: "Rate",
